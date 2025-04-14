@@ -2,6 +2,7 @@ from typing import Any
 import gspread
 from mcp.server.fastmcp import FastMCP
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 mcp = FastMCP("spreadsheet-analyzer")
 
@@ -14,7 +15,6 @@ gc = gspread.authorize(creds)
 @mcp.tool()
 async def list_spreadsheets(folder_id: str) -> str:
     """List Google Sheets in a specific folder."""
-    from googleapiclient.discovery import build
     drive_service = build('drive', 'v3', credentials=creds)
     results = drive_service.files().list(
         q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet'",
