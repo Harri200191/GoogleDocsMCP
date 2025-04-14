@@ -20,7 +20,7 @@ class Configurations:
     SERVER_VERSION = os.getenv("MCP_SERVER_VERSION", "0.1.0")
     SUPPORTED_TOOLS = ["get_insights", "get_future_recommendations"]
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
+    ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
     ANTHROPIC_MAX_TOKENS = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1000"))
     DEFAULT_NUM_ROWS_FOR_ANALYSIS = int(os.getenv("NUM_ROWS_FOR_ANALYSIS", 500))
     SPREADSHEET_FOLDER_NAME = os.getenv("SPREADSHEET_FOLDER_NAME", "Khaapa BESE 13-A")

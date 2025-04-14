@@ -41,7 +41,7 @@ class MCPClient:
         } for tool in tools]
 
         resp = self.anthropic.messages.create(
-            model="claude-3-sonnet-20240229",
+            model=self.configs.ANTHROPIC_MODEL,
             max_tokens=1000,
             messages=messages,
             tools=tool_list

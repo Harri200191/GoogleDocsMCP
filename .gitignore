@@ -1,3 +1,4 @@
 .env
 /.github
 lib/configs/secrets.json
+lib/configs/__pycache__/
