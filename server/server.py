@@ -8,7 +8,7 @@ mcp = FastMCP("spreadsheet-analyzer")
 
 # Auth and gspread client
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly", "https://www.googleapis.com/auth/drive.readonly"]
-creds = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+creds = Credentials.from_service_account_file("configs/secrets.json", scopes=SCOPES)
 gc = gspread.authorize(creds)
 
 # Tool: List spreadsheets in a folder
