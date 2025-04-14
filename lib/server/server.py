@@ -3,15 +3,19 @@ import gspread
 from mcp.server.fastmcp import FastMCP
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from lib.configs.configs import Configurations
 
-mcp = FastMCP("spreadsheet-analyzer")
+configs = Configurations()
+mcp = FastMCP(configs.SERVER_NAME)
 
 # Auth and gspread client
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly", "https://www.googleapis.com/auth/drive.readonly"]
-creds = Credentials.from_service_account_file("configs/secrets.json", scopes=SCOPES)
+creds = Credentials.from_service_account_file(
+    configs.CREDENTIALS_FILE, 
+    scopes=configs.SCOPES
+)
+
 gc = gspread.authorize(creds)
 
-# Tool: List spreadsheets in a folder
 @mcp.tool()
 async def list_spreadsheets(folder_id: str) -> str:
     """List Google Sheets in a specific folder."""
@@ -25,7 +29,6 @@ async def list_spreadsheets(folder_id: str) -> str:
         return "No spreadsheets found."
     return "\n".join([f"{f['name']} ({f['id']})" for f in files])
 
-# Tool: Read sheet data (first sheet)
 @mcp.tool()
 async def get_sheet_data(spreadsheet_id: str) -> str:
     """Get the data from the first worksheet of the spreadsheet."""
