@@ -1,10 +1,13 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 
 class Configurations:
-    CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_PATH", BASE_DIR / "configs/secrets.json")
+    CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_PATH", BASE_DIR / "secrets.json")
     SPREADSHEET_IDS_DIR = os.getenv("SPREADSHEET_IDS_DIR", BASE_DIR / "spreadsheets")
     DEFAULT_SHEET_RANGE = os.getenv("DEFAULT_SHEET_RANGE", "Sheet1!A1:Z1000")  
 
@@ -20,5 +23,6 @@ class Configurations:
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
     ANTHROPIC_MAX_TOKENS = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1000"))
     DEFAULT_NUM_ROWS_FOR_ANALYSIS = int(os.getenv("NUM_ROWS_FOR_ANALYSIS", 500))
+    SPREADSHEET_FOLDER_NAME = os.getenv("SPREADSHEET_FOLDER_NAME", "Khaapa BESE 13-A")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 

@@ -1,9 +1,15 @@
-from typing import Any
-import gspread
+import os
+import io
+import pandas as pd
+import sys
 from mcp.server.fastmcp import FastMCP
-from google.oauth2.service_account import Credentials
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from configs.configuration import Configurations
+
 from googleapiclient.discovery import build
-from lib.configs.configs import Configurations
+from googleapiclient.http import MediaIoBaseDownload
+from google.oauth2.service_account import Credentials
 
 configs = Configurations()
 mcp = FastMCP(configs.SERVER_NAME)
@@ -14,52 +20,71 @@ creds = Credentials.from_service_account_file(
     scopes=configs.SCOPES
 )
 
-gc = gspread.authorize(creds)
+drive_service = build('drive', 'v3', credentials=creds)
+sheets_service = build('sheets', 'v4', credentials=creds)
+
+def find_folder_id(folder_name: str):
+    query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder'"
+    results = drive_service.files().list(q=query, fields="files(id)").execute()
+    folders = results.get("files", [])
+    return folders[0]["id"] if folders else None
+
+def list_spreadsheets(folder_id: str):
+    query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet'"
+    results = drive_service.files().list(q=query, pageSize=MAX_SHEETS, fields="files(id, name)").execute()
+    return results.get("files", [])
+
+def read_spreadsheet(file_id: str):
+    result = sheets_service.spreadsheets().values().get(spreadsheetId=file_id, range="A1:Z1000").execute()
+    values = result.get("values", [])
+    if not values:
+        return pd.DataFrame()
+    df = pd.DataFrame(values[1:], columns=values[0])
+    return df
+
+def load_all_data():
+    folder_id = find_folder_id(configs.SPREADSHEET_FOLDER_NAME)
+    if not folder_id:
+        return []
+
+    files = list_spreadsheets(folder_id)
+    dataframes = []
+    for file in files:
+        df = read_spreadsheet(file["id"])
+        df["_source"] = file["name"]
+        dataframes.append(df)
+    return dataframes
+
+ALL_DFS = load_all_data()
 
 @mcp.tool()
-async def list_spreadsheets(folder_id: str) -> str:
-    """List Google Sheets in a specific folder."""
-    drive_service = build('drive', 'v3', credentials=creds)
-    results = drive_service.files().list(
-        q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet'",
-        fields="files(id, name)",
-    ).execute()
-    files = results.get('files', [])
-    if not files:
-        return "No spreadsheets found."
-    return "\n".join([f"{f['name']} ({f['id']})" for f in files])
+async def get_insights() -> str:
+    """Returns key insights from the loaded spreadsheets."""
+    if not ALL_DFS:
+        return "No data found."
+
+    insights = []
+    for df in ALL_DFS:
+        cols = ", ".join(df.columns)
+        insights.append(f"Sheet: {df['_source'].iloc[0]}\nColumns: {cols}\nRows: {len(df)}")
+
+    return "\n\n".join(insights)
 
 @mcp.tool()
-async def get_sheet_data(spreadsheet_id: str) -> str:
-    """Get the data from the first worksheet of the spreadsheet."""
-    try:
-        sh = gc.open_by_key(spreadsheet_id)
-        worksheet = sh.get_worksheet(0)
-        data = worksheet.get_all_values()
-        preview = "\n".join([", ".join(row) for row in data[:10]])
-        return f"Sheet: {sh.title}\nPreview:\n{preview}"
-    except Exception as e:
-        return f"Error reading spreadsheet: {e}"
+async def get_future_recommendations() -> str:
+    """Returns future recommendations based on spreadsheet patterns."""
+    if not ALL_DFS:
+        return "No data to generate recommendations."
 
-# Tool: Analyze data and give insights
-@mcp.tool()
-async def get_insights(spreadsheet_id: str) -> str:
-    """Give high-level insights from spreadsheet data."""
-    sh = gc.open_by_key(spreadsheet_id)
-    worksheet = sh.get_worksheet(0)
-    data = worksheet.get_all_values()
-    headers = data[0]
-    rows = data[1:]
-    insights = f"Sheet has {len(rows)} rows and {len(headers)} columns. Columns: {headers}"
-    # You could add more logic like stats here
-    return insights
+    # Dummy logic (customize with ML/stats)
+    recommendations = []
+    for df in ALL_DFS:
+        rec = f"Sheet: {df['_source'].iloc[0]} — consider monitoring columns like {df.columns[:2].tolist()}"
+        recommendations.append(rec)
 
-# Tool: Suggest future actions based on data
-@mcp.tool()
-async def get_future_recommendations(spreadsheet_id: str) -> str:
-    """Suggest actions based on trends in spreadsheet data."""
-    # Dummy logic for now
-    return "Based on current data trends, consider reviewing rows with missing values or outliers in key metrics."
+    return "\n".join(recommendations)
 
 if __name__ == "__main__":
+    print("Running MCP server...")
     mcp.run(transport="stdio")
+    print("MCP server is running.")

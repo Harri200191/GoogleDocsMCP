@@ -1,79 +1,89 @@
-import asyncio
 import sys
+import asyncio
 from contextlib import AsyncExitStack
+from typing import Optional
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from configs.configuration import Configurations
+
+from anthropic import Anthropic
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from anthropic import Anthropic
 
 class MCPClient:
     def __init__(self):
-        self.session = None
+        self.configs = Configurations()
+        self.session: Optional[ClientSession] = None
+        self.anthropic = Anthropic(api_key=self.configs.ANTHROPIC_API_KEY)
         self.exit_stack = AsyncExitStack()
-        self.anthropic = Anthropic()
 
-    async def connect(self, server_script: str):
-        command = "python"
-        server_params = StdioServerParameters(command=command, args=[server_script])
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
-        self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
+    async def connect_to_server(self, script_path: str):
+        server_params = StdioServerParameters(
+            command="python",
+            args=[script_path]
+        )
+        stdio = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        self.session = await self.exit_stack.enter_async_context(ClientSession(*stdio))
         await self.session.initialize()
 
         tools = (await self.session.list_tools()).tools
-        print("Connected to server with tools:", [t.name for t in tools])
+        print("✅ Connected with tools:", [t.name for t in tools])
 
     async def process_query(self, query: str) -> str:
-        tools = (await self.session.list_tools()).tools
-        tool_specs = [
-            {
-                "name": t.name,
-                "description": t.description,
-                "input_schema": t.inputSchema
-            } for t in tools
-        ]
-
         messages = [{"role": "user", "content": query}]
-        response = self.anthropic.messages.create(
+        tools = (await self.session.list_tools()).tools
+
+        tool_list = [{
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.inputSchema
+        } for tool in tools]
+
+        resp = self.anthropic.messages.create(
             model="claude-3-sonnet-20240229",
             max_tokens=1000,
-            tools=tool_specs,
             messages=messages,
+            tools=tool_list
         )
 
-        final_response = []
+        full_response = []
 
-        for item in response.content:
-            if item.type == "text":
-                final_response.append(item.text)
-            elif item.type == "tool_use":
-                result = await self.session.call_tool(item.name, item.input)
-                final_response.append(result.content)
+        for content in resp.content:
+            if content.type == "text":
+                full_response.append(content.text)
+            elif content.type == "tool_use":
+                tool_resp = await self.session.call_tool(content.name, content.input)
+                full_response.append(f"[Tool: {content.name}]\n{tool_resp.content[0].text}")
 
-        return "\n".join(final_response)
+        return "\n".join(full_response)
 
-    async def run(self):
-        print("Enter query (type 'quit' to exit):")
+    async def chat_loop(self):
+        print("🔍 Ask your questions (type 'quit' to exit):")
         while True:
-            query = input(">>> ").strip()
-            if query.lower() == "quit":
-                break
             try:
-                result = await self.process_query(query)
-                print(result)
+                q = input("\n> ").strip()
+                if q.lower() == "quit":
+                    break
+                result = await self.process_query(q)
+                print("\n💬", result)
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"❌ Error: {e}")
 
     async def cleanup(self):
         await self.exit_stack.aclose()
 
 async def main():
     if len(sys.argv) < 2:
-        print("Usage: python client.py <path_to_server_script>")
-        sys.exit(1)
-    client = MCPClient()
-    await client.connect(sys.argv[1])
-    await client.run()
-    await client.cleanup()
+        print("Usage: python client.py path/to/server.py")
+        return
 
-if __name__ == "__main__":
+    client = MCPClient()
+    try:
+        await client.connect_to_server(sys.argv[1])
+        await client.chat_loop()
+    finally:
+        await client.cleanup()
+
+if __name__ == "__main__": 
     asyncio.run(main())
