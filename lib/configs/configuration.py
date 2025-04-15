@@ -23,6 +23,7 @@ class Configurations:
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
     ANTHROPIC_MAX_TOKENS = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1000"))
     DEFAULT_NUM_ROWS_FOR_ANALYSIS = int(os.getenv("NUM_ROWS_FOR_ANALYSIS", 500))
-    SPREADSHEET_FOLDER_NAME = os.getenv("SPREADSHEET_FOLDER_NAME", "Khaapa BESE 13-A")
+    SPREADSHEET_FOLDER_NAME = os.getenv("SPREADSHEET_FOLDER_NAME", "Khaapa_Directory")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    MAX_SHEETS = int(os.getenv("MAX_SHEETS", 100))
 
