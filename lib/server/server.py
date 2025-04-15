@@ -49,17 +49,34 @@ def find_folder_id(folder_name: str):
         return None 
 
 def list_spreadsheets(folder_id: str):
-    query = f"'{folder_id}' in parents and mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+    query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet'"
     results = drive_service.files().list(q=query, pageSize=configs.MAX_SHEETS, fields="files(id, name)").execute() 
 
     return results.get("files", [])
 
 def read_spreadsheet(file_id: str):
-    result = sheets_service.spreadsheets().values().get(spreadsheetId=file_id, range="A1:Z1000").execute()
+    result = sheets_service.spreadsheets().values().get(
+        spreadsheetId=file_id, range="A1:Z1000"
+    ).execute()
+
     values = result.get("values", [])
     if not values:
         return pd.DataFrame()
-    df = pd.DataFrame(values[1:], columns=values[0])
+
+    headers = values[0]
+    rows = values[1:]
+
+    normalized_rows = []
+    for row in rows:
+        if len(row) < len(headers):
+            # Pad short rows
+            row += [None] * (len(headers) - len(row))
+        elif len(row) > len(headers):
+            # Trim long rows
+            row = row[:len(headers)]
+        normalized_rows.append(row)
+
+    df = pd.DataFrame(normalized_rows, columns=headers)
     return df
 
 def load_all_data():
@@ -72,7 +89,7 @@ def load_all_data():
     dataframes = []
     
     for file in files:
-        df = read_excel_from_drive(file["id"])
+        df = read_spreadsheet(file["id"])
         df["_source"] = file["name"]
         dataframes.append(df)
     
