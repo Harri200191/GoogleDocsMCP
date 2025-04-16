@@ -97,32 +97,64 @@ def load_all_data():
 
 ALL_DFS = load_all_data() 
 
-@mcp.tool()
+@mcp.tool(name="get_insights", description="Returns summaries and statistics about the spreadsheets.")
 async def get_insights() -> str:
-    """Returns key insights from the loaded spreadsheets."""
+    """Returns key insights from the loaded spreadsheets.""" 
     if not ALL_DFS:
         return "No data found."
 
     insights = []
     for df in ALL_DFS:
-        cols = ", ".join(map(str, df.columns))
-        insights.append(f"Sheet: {df['_source'].iloc[0]}\nColumns: {cols}\nRows: {len(df)}")
+        source = df["_source"].iloc[0]
+        cols = df.columns.tolist()
+        num_rows = len(df)
+
+        summary = f"Sheet: {source}\nColumns: {', '.join(cols)}\nRows: {num_rows}\n"
+
+        # Try to pull some insights depending on sheet type
+        if "Inventory" in source:
+            summary += f"→ Appears to be an inventory sheet.\n"
+            if "Total Profit" in df.columns:
+                try:
+                    df["Total Profit"] = pd.to_numeric(df["Total Profit"], errors="coerce")
+                    total_profit = df["Total Profit"].sum()
+                    summary += f"→ Total Profit: {total_profit}\n"
+                except Exception as e:
+                    summary += f"→ Couldn't parse Total Profit. Error: {e}\n"
+
+        elif "Fund" in source:
+            summary += f"→ Appears to be a class fund sheet.\n"
+            if "Amount Collection 1" in df.columns:
+                df["Amount Collection 1"] = pd.to_numeric(df["Amount Collection 1"], errors="coerce")
+                total_collected = df["Amount Collection 1"].sum()
+                summary += f"→ Total collected (round 1): {total_collected}\n"
+
+        elif "Khapa" in source or "Timetable" in source:
+            summary += f"→ Likely a schedule or attendance sheet.\n"
+            if "Day" in df.columns:
+                unique_days = df["Day"].nunique()
+                summary += f"→ Number of unique days: {unique_days}\n"
+
+        insights.append(summary)
 
     return "\n\n".join(insights)
 
+
 @mcp.tool()
 async def get_future_recommendations() -> str:
-    """Returns future recommendations based on spreadsheet patterns."""
-    if not ALL_DFS:
-        return "No data to generate recommendations."
-
-    # Dummy logic (customize with ML/stats)
+    """Returns future recommendations based on the data."""
     recommendations = []
-    for df in ALL_DFS:
-        rec = f"Sheet: {df['_source'].iloc[0]} — consider monitoring columns like {df.columns[:2].tolist()}"
-        recommendations.append(rec)
 
-    return "\n".join(recommendations)
+    for df in ALL_DFS:
+        source = df["_source"].iloc[0]
+        if "Inventory" in source:
+            recommendations.append(f"📦 Inventory Sheet:\n→ Consider restocking items with zero quantity.\n")
+        elif "Fund" in source:
+            recommendations.append(f"💰 Fund Sheet:\n→ Encourage members who haven't paid to contribute.\n")
+        elif "Khapa" in source:
+            recommendations.append(f"📅 Schedule Sheet:\n→ Consider filling the empty time slots or rotating team members.\n")
+
+    return "\n\n".join(recommendations)
 
 if __name__ == "__main__":
     print("Running MCP server...")
